@@ -1,7 +1,9 @@
 import express, { Request, Response } from "express";
-import { body, validationResult } from "express-validator";
-import { RequestValidationError } from "../errors/request-validation-error";
+import { body } from "express-validator";
+import { BadRequestError } from "../errors/bad-request-error";
+import { validateRequest } from "../middlewares/validate-request";
 import { User } from "../models/user";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
@@ -14,21 +16,31 @@ router.post(
       .isLength({ min: 8, max: 16 })
       .withMessage("Password must be between 8-16"),
   ],
+  validateRequest,
   async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new RequestValidationError(errors.array());
-    }
     const { email, password } = req.body;
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      console.log("Email in use");
-      return res.send({});
+      throw new BadRequestError("Email in use");
     }
 
     const user = User.build({ email, password });
     await user.save();
+
+    // Generate JWT
+    const userJwt = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+      },
+      process.env.JWT_KEY!
+    );
+
+    // Store on Session object
+    req.session = {
+      jwt: userJwt,
+    };
 
     res.status(201).send(user);
   }
