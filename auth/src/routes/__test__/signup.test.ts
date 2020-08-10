@@ -1,3 +1,4 @@
+import { response } from 'express';
 import request from 'supertest';
 import { app } from '../../app';
 
@@ -33,4 +34,25 @@ it('returns a 400 with an invalid password', async () => {
 
 it('returns a 400 with missing email pass', async () => {
   return request(app).post('/api/users/signup').send({}).expect(400);
+});
+
+it('disallowes duplicate emails', async () => {
+  await request(app)
+    .post('/api/users/signup')
+    .send({ email: 'seb@maz.com', password: '123123123' })
+    .expect(201);
+
+  await request(app)
+    .post('/api/users/signup')
+    .send({ email: 'seb@maz.com', password: '123123123' })
+    .expect(400);
+});
+
+it('sets a cookie after successful signup', async () => {
+  const response = await request(app)
+    .post('/api/users/signup')
+    .send({ email: 'seb@maz.com', password: '123123123' })
+    .expect(201);
+
+  expect(response.get('Set-Cookie')).toBeDefined();
 });
